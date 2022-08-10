@@ -1,1 +1,248 @@
-02
+#downloadWordFromExcel.py
+import requests
+from requests_html import HTMLSession
+from bs4 import BeautifulSoup
+import os
+import traceback
+import time 
+from openpyxl import Workbook
+from openpyxl import load_workbook
+
+class WordDown(object):
+    def __init__(self):
+        self.dirPath = os.path.join(os.getcwd() + '\\newEastWord\\wordList')
+        self.user_agent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/69.0.3497.100 Safari/537.36"
+        self.headers = {"User-Agent": self.user_agent}
+        self.audioPlay = """<audio controls height='50' width='50'>
+                            <source src='{0}' type='audio/mpeg'>
+                            <embed height='50' width='50' src='{0}'>
+                        </audio>"""
+    
+    def run(self):
+        filePath = os.path.join(self.dirPath + '\\test.xlsx')
+        wb = load_workbook(filePath)
+        sht = wb['all']
+        saveNum = 0
+        for ci in range(10, 13):  # 共100281，  -------------------
+            saveNum = saveNum + 1
+            word = sht.cell(ci,1).value
+            wordUrl = sht.cell(ci,2).value
+            wordDetailList = self.getWordDetail(word, wordUrl)
+
+            for cj in range(1, len(wordDetailList)):
+                sht.cell(ci, cj + 2).value = wordDetailList[cj]
+            if saveNum == 2:
+                saveNum = 0
+                wb.save(filePath)
+            
+        wb.save(filePath)
+
+    def getWordDetail(self, wordText, wordUrl):
+        wordDetailList=[wordText,'','','','','','','','','']
+        try:
+            # cookie="mediav=%7B%22eid%22%3A%22387123...b3574ef2-21b9-11e8-b39c-1bc4029c43b8"# 在浏览器开发模式查看cookie,
+            # headers={"User-Agent":user_agent,"Cookie":cookie}
+            resp = requests.get(wordUrl, headers=self.headers)
+            time.sleep(1)
+            soup = BeautifulSoup(resp.text, "html.parser")
+            
+            wordSpellBoxList = soup.find_all(attrs={'class': 'word-spell-box'})
+            colIdx = 0
+            for obj in wordSpellBoxList:
+                word1 = obj.find(attrs={'class': 'word-spell'}).text
+                audioUrl = 'http:' + obj.find(attrs={'class': 'word-spell-audio'}).get('data-url')
+                colIdx =  colIdx + 1
+                print(word1, audioUrl)
+                if colIdx == 1:
+                   wordDetailList[colIdx] = word1
+                   self.downloadFile(wordText + '_e', audioUrl)
+                   time.sleep(1)
+                else:
+                   wordDetailList[colIdx] = word1
+                   self.downloadFile(wordText + '_a', audioUrl)
+                   time.sleep(1)
+
+            detailsMeaning = soup.find_all(attrs={'class': 'details-content-title-box'})
+            file_path = os.path.join(self.dirPath, wordText + '.html')
+            with open(file_path, "w", encoding="utf-8", newline='\n') as f:
+                f.write('<h3>' + wordText + '</h3>\n')
+                f.write('<h3>　　' + wordDetailList[1] + self.audioPlay.replace('{0}', wordText + '_e.mp3') + '</h3>\n')
+                f.write('<h3>　　' + wordDetailList[2] + self.audioPlay.replace('{0}', wordText + '_a.mp3') + '</h3>\n')
+                for obj in detailsMeaning:
+                    colIdx =  colIdx + 1
+                    wordDetailList[colIdx] = obj.text
+                    f.write(str(obj))
+
+            return wordDetailList
+            
+        except Exception as e:
+            print(str(e))
+            print(traceback.print_exc())
+            print(traceback.format_exc())
+            print("取得できませんでした")
+
+    # # def DownloadFile(mp3_url, save_url, file_name):
+    def downloadFile(self, word,url):
+        try:
+            save_url = os.getcwd()+'\\newEastWord\\wordList'
+            file_name = word + '.mp3'
+            if url is None or save_url is None or file_name is None:
+                print('参数错误')
+                return None
+            folder = os.path.exists(save_url)
+            if not folder:
+                os.makedirs(save_url)
+            res = requests.get(url, stream=True, verify=False)
+            file_path = os.path.join(save_url, file_name)
+            print('开始写入文件：', file_path)
+            with open(file_path, 'wb') as fd:
+                for data in res.iter_content():
+                    fd.write(data)
+            print(file_name+' 成功下载！')
+        except:
+            print("程序错误")
+
+    # def getExcelFile(self, dirPath, filePath, sheetName):
+    #     if not os.path.exists(self.dirPath):
+    #         os.mkdir(self.dirPath)
+    #     # filePath = os.path.join(self.dirPath, "word.xlsx")
+    #     if not os.path.exists(filePath):
+    #         wb = Workbook()
+    #         ws = wb.active
+    #         ws.title = sheetName  
+    #         wb.save(filePath)      
+
+    #     os.chdir(self.dirPath)
+    #     wb = load_workbook(filePath)
+    #     if not sheetName in wb.sheetnames:
+    #         wb.create_sheet(sheetName)
+    #     # sht = wb['01']
+    #     return wb
+
+
+
+if __name__== '__main__':
+    down = WordDown()
+    down.run()
+
+
+
+
+# https://www.koolearn.com/dict/tag_2732_1.html
+# https://www.koolearn.com/dict/tag_2732_41.html
+#  <div class="word-box">
+#     <a class="word" href="/dict/wd_42020.html">development</a>
+#     <a class="word" href="/dict/wd_5115.html">already</a>
+#     <a class="word" href="/dict/wd_54085.html">face</a>
+# </div>
+
+# 单词
+# https://www.koolearn.com/dict/wd_77734.html
+
+# <div class="content-box">
+#     <div class="details-title"><div class="title-text">听听怎么读</div></div>
+#     <div class="details-content">
+#         <div class="word-spell-box">
+#             <span class="word-spell">英 [ˌɪnɔ:ˈgænɪk]</span><span class="word-spell-audio" data-url="//picflow.koolearn.com/dict/mp3/2ea8a699bac7bd91880bc3ffd010dbc0.mp3"></span>
+#         </div>
+#         <div class="word-spell-box">
+#             <span class="word-spell">美 [ˌɪnɔrˈgænɪk]</span><span class="word-spell-audio" data-url="//picflow.koolearn.com/dict/mp3/6de75ac6932f61a518fbe520b77dddce.mp3"></span>
+#         </div>
+#     </div>
+# </div>
+
+# 发音
+# https://picflow.koolearn.com/dict/mp3/6de75ac6932f61a518fbe520b77dddce.mp3
+
+# <div class="details-title">
+#     <div class="title-text">是什么意思</div>
+# </div>
+# <div class="details-content">
+#     <div class="details-content-title-box">
+#         <div>
+#             <li class="clearfix"><span class="prop">adj.</span>
+#                 <p>
+#                     <span>[化]无机的；</span><span>无组织结构的；</span><span>无生物的；</span><span>无活力的</span>
+#                 </p></li>
+#         </div>
+#         <h2 class="details-content-title">英英释义</h2>
+#         <div>
+#             <div class="trans-container">
+#                 <h4>
+#                     inorganic<span class="phonetic">[ inɔ:'ɡænik ]</span>
+#                 </h4>
+#                 <ul>
+#                     <li><span class="pos">adj.</span>
+#                         <ul class="ol">
+#                             <li><span class="def">relating or belonging to the
+#                                     class of compounds not having a carbon basis</span>
+#                                 <p>
+#                                     <em>"hydrochloric and sulfuric acids are called inorganic
+#                                         substances"</em>
+#                                 </p></li>
+#                             <li><span class="def">lacking the properties
+#                                     characteristic of living organisms</span></li>
+#                         </ul></li>
+#                 </ul>
+#             </div>
+#         </div>
+#     </div>
+# </div>
+
+
+# <div class="details-title">
+#     <div class="title-text">学习怎么用</div>
+# </div>
+# <div class="details-content">
+#     <div class="details-content-title-box">
+#         <h2 class="details-content-title">词组短语</h2>
+#         <div>
+#             <p class="wordGroup">
+#                 <span class="contentTitle">inorganic chemistry</span>无机化学
+#             </p>
+#             <p class="wordGroup">
+#                 <span class="contentTitle">inorganic salt</span>无机盐
+#             </p>
+#             <p class="wordGroup">
+#                 <span class="contentTitle">inorganic acid</span>无机酸
+#             </p>
+#             <div class="more">
+#                 <span class="show_more">更多</span><span class="show_less">收起</span>词组短语
+#             </div>
+#         </div>
+#         <h2 class="details-content-title">双语例句</h2>
+#         <div>
+#             <div>
+#                 <b>用作形容词(adj.)</b>
+#             </div>
+#             <ol slider="2">
+#                 <li>Rocks and minerals are inorganic.<br>岩石和矿物都是无机物。
+#                 </li>
+#                 <li>Farmers enrich the soil with organic and inorganic
+#                     manures.<br>农民用有机肥料和无机肥料来提高土壤的肥力。
+#                 </li>
+#                 <li>It is an inorganic form of society.<br>这是一种非由自然发展而形成的社会形式。
+#                 </li>
+#             </ol>
+#         </div>
+#         <h2 class="details-content-title">权威例句</h2>
+#         <div>
+#             Inorganic Electronic Spectroscopy</br>Inorganic electronic spectroscopy</br>Open-Framework
+#             Inorganic Materials.</br>Thermochemical properties of inorganic
+#             substances</br>Infrared spectra of inorganic and coordination compounds
+#             (Nakamoto, Kazuo)</br>Nanoengineering of inorganic and hybrid hollow
+#             spheres by colloidal templating</br>Generalized synthesis of periodic
+#             surfactant/inorganic composite materials</br>Recent Advances in the
+#             Liquid-Phase Syntheses of Inorganic Nanoparticles</br>Biodegradable and
+#             bioactive porous polymer/inorganic composite scaffolds for bone
+#             tissue engineering</br>Bond-valence parameters obtained from a systematic
+#             analysis of the Inorganic Crystal Structure Database
+#         </div>
+#     </div>
+# </div>
+
+
+
+
+
+
